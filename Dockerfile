@@ -2,7 +2,7 @@
 # Una sola imagen: la API (Express) sirve también el front compilado.
 
 # ── 1. Front ───────────────────────────────────────────────
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /app
 COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
@@ -12,7 +12,7 @@ COPY src ./src
 RUN npm run build
 
 # ── 2. API ─────────────────────────────────────────────────
-FROM node:22-alpine AS api
+FROM node:26-alpine AS api
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
@@ -21,7 +21,7 @@ COPY server/src ./src
 RUN npm run build && npm prune --omit=dev
 
 # ── 3. Imagen final ────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production \
     PORT=3001 \
     STATIC_DIR=/app/dist
