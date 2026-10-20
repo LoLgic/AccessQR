@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Front (tipos + compilación)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run build
+
+  server:
+    name: API (tipos, pruebas y PostgreSQL real)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: accessqr
+          POSTGRES_PASSWORD: accessqr
+          POSTGRES_DB: accessqr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U accessqr -d accessqr_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      QR_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-0123
+      TEST_DATABASE_URL: postgres://accessqr:accessqr@localhost:5432/accessqr_test
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run typecheck
+      - name: Pruebas unitarias
+        run: npm test
+        env:
+          DATABASE_URL: postgres://x:x@localhost:5432/x
+      - name: Pruebas de integración (migraciones + seed + API)
+        run: npm run test:integration
+
+  docker:
+    name: Imagen Docker (se construye sin publicar)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

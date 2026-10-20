@@ -1,0 +1,43 @@
+# Render Blueprint de AccessQR: https://render.com/docs/blueprint-spec
+# Render lee este archivo desde la raíz del repositorio y crea la base de datos y la aplicación.
+# Cada push a la rama conectada se publica solo (cuando pasan las pruebas de GitHub Actions).
+
+databases:
+  - name: accessqr-db
+    databaseName: accessqr
+    user: accessqr
+    plan: free              # el plan gratuito se elimina a los 30 días y no tiene respaldos: ver DEPLOY.md
+    region: virginia        # la más cercana a Colombia; debe ser la misma que la del servicio web
+    postgresMajorVersion: "16"
+    ipAllowList: []         # sin acceso desde Internet: solo la app (red interna de Render)
+
+services:
+  - type: web
+    name: accessqr
+    runtime: docker         # usa el ./Dockerfile del repositorio (API + front en una sola imagen)
+    plan: free
+    region: virginia
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass   # publica solo si los chequeos de GitHub Actions (CI) pasan
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: TRUST_PROXY      # Render termina el HTTPS delante de la app
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: accessqr-db
+          property: connectionString
+      - key: QR_SECRET        # Render genera un valor aleatorio y lo conserva entre despliegues
+        generateValue: true
+      - key: QR_TTL_SECONDS
+        value: "120"
+      - key: APP_TIME_ZONE
+        value: America/Bogota
+      - key: COMPANY_NAME
+        value: NovaTech Solutions
+      # Recuperación de contraseña por correo (opcional): se activa después, desde el panel de Render
+      # (servicio → Environment) añadiendo SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS y SMTP_FROM.
+      # Sin SMTP_HOST la función queda desactivada. Ver DEPLOY.md.
